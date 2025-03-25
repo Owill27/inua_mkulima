@@ -22,7 +22,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, PlusIcon } from "lucide-react";
+import {
+  Loader2,
+  Loader2Icon,
+  MinusIcon,
+  PlusIcon,
+  TrashIcon,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 import {
@@ -32,9 +38,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogContent,
 } from "@/components/ui/dialog";
-import { DialogContent } from "@radix-ui/react-dialog";
 import { format } from "date-fns";
+import { formatPrice } from "@/utils/format-price";
+import { useLoggedUser } from "@/hooks/logged-user";
+import { useRouter } from "next/router";
 
 const formSchema = z.object({
   products: z.array(
@@ -43,9 +52,12 @@ const formSchema = z.object({
       price: z.number(),
       subsidy: z.number(),
       productId: z.string({ required_error: "Product ID is required" }),
-      quantity: z
-        .number({ required_error: "Quantity is required" })
-        .min(1, "Minimum quantity is 1"),
+      quantity: z.preprocess(
+        (val) => (typeof val === "string" ? Number(val) : val),
+        z
+          .number({ required_error: "Quantity is required" })
+          .min(1, "Minimum quantity is 1")
+      ),
     })
   ),
 });
@@ -53,6 +65,8 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export default function Home() {
+  const router = useRouter();
+  const { logged: loggedUser } = useLoggedUser();
   const {
     data: products,
     isLoading,
@@ -86,6 +100,40 @@ export default function Home() {
       return sum + deduction;
     }, 0);
   }, [selectedProducts]);
+
+  const incrementQty = useCallback(
+    (idx: number) => {
+      const currValues = formState.getValues("products");
+      const currItem = currValues[idx];
+
+      if (currItem) {
+        const newArr = [...currValues];
+        newArr[idx] = {
+          ...currItem,
+          quantity: Number(currItem.quantity) + 1,
+        };
+        formState.setValue("products", newArr);
+      }
+    },
+    [formState]
+  );
+
+  const decrementQty = useCallback(
+    (idx: number) => {
+      const currValues = formState.getValues("products");
+      const currItem = currValues[idx];
+
+      if (currItem && currItem.quantity > 1) {
+        const newArr = [...currValues];
+        newArr[idx] = {
+          ...currItem,
+          quantity: Number(currItem.quantity) - 1,
+        };
+        formState.setValue("products", newArr);
+      }
+    },
+    [formState]
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState("");
@@ -130,7 +178,13 @@ export default function Home() {
   let view: ReactNode = null;
 
   if (isLoading && !products?.length) {
-    view = <div>Loading...</div>;
+    view = (
+      <div className="flex w-full h-[100vh] items-center justify-center">
+        <div>
+          <Loader2Icon size={40} className="animate-spin" />
+        </div>
+      </div>
+    );
   } else if (error && !products?.length) {
     view = (
       <div className="text-center">
@@ -148,12 +202,14 @@ export default function Home() {
             <div className="flex flex-col md:flex-row gap-5">
               <Card className="w-full">
                 <CardContent>
+                  <div className="font-semibold mb-5">Products</div>
+
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right"></TableHead>
                       </TableRow>
                     </TableHeader>
 
@@ -164,12 +220,15 @@ export default function Home() {
                         return (
                           <TableRow key={p.id}>
                             <TableCell>{p.name}</TableCell>
-                            <TableCell>{p.price}</TableCell>
-                            <TableCell>
+                            <TableCell className="text-right">
+                              {formatPrice(p.price)}
+                            </TableCell>
+                            <TableCell className="text-right">
                               {!isSelected && (
                                 <Button
                                   size="icon"
                                   variant="outline"
+                                  type="button"
                                   onClick={() =>
                                     selection.append({
                                       name: p.name,
@@ -194,81 +253,118 @@ export default function Home() {
 
               <Card className="w-full">
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Total deduction</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
+                  <div className="font-semibold mb-5">Selected Products</div>
 
-                    <TableBody>
-                      {selection.fields.map((f, idx) => {
-                        const total = f.price * f.quantity;
-                        const deduction = total * (f.subsidy / 100);
+                  {selectedProducts.length ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="text-right">
+                            Deduction
+                          </TableHead>
+                          <TableHead className="text-right"></TableHead>
+                        </TableRow>
+                      </TableHeader>
 
-                        return (
-                          <TableRow key={f.id}>
-                            <TableCell>{f.name}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button size="icon">
-                                  <PlusIcon />
+                      <TableBody>
+                        {selection.fields.map((f, idx) => {
+                          const total = f.price * f.quantity;
+                          const deduction = total * (f.subsidy / 100);
+
+                          return (
+                            <TableRow key={f.id}>
+                              <TableCell>{f.name}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    type="button"
+                                    onClick={() => decrementQty(idx)}
+                                  >
+                                    <MinusIcon />
+                                  </Button>
+
+                                  <Input
+                                    {...formState.register(
+                                      `products.${idx}.quantity`
+                                    )}
+                                    type="number"
+                                    className="w-full min-w-[100px]"
+                                  />
+
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    type="button"
+                                    onClick={() => incrementQty(idx)}
+                                  >
+                                    <PlusIcon />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatPrice(f.price, "")}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatPrice(total, "")}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatPrice(deduction, "")}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => selection.remove(idx)}
+                                >
+                                  <TrashIcon />
                                 </Button>
-
-                                <Input
-                                  {...formState.register(
-                                    `products.${idx}.quantity`
-                                  )}
-                                  type="number"
-                                />
-
-                                <Button size="icon">
-                                  <PlusIcon />
-                                </Button>
-                              </div>
-                            </TableCell>
-                            <TableCell>{f.price}</TableCell>
-                            <TableCell>{total}</TableCell>
-                            <TableCell>{deduction}</TableCell>
-                            <TableCell>
-                              <button onClick={() => selection.remove(idx)}>
-                                -
-                              </button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center">No products selected</div>
+                  )}
                 </CardContent>
               </Card>
             </div>
 
             {!!submitErr && <div className="mt-5 text-center">{submitErr}</div>}
 
-            <div className="flex justify-center align-center mt-5 gap-3">
-              <Button type="button" variant="outline">
+            <div className="flex justify-center align-center mt-5 gap-3 max-w-[600px] mx-auto">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.push("/transactions")}
+              >
                 Back
               </Button>
-              <Button type="submit" variant="default">
+              <Button type="submit" variant="default" className="flex-1">
                 {isSubmitting && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
                 {isSubmitting
                   ? "Submitting..."
-                  : `Deduct ${totalDeduction} Kes`}
+                  : `Deduct ${formatPrice(totalDeduction)}`}
               </Button>
             </div>
 
-            <div className="mt-5 text-center">
-              You will receive {totalDeduction} Kes from the subsidy program. If
-              this does not cover the total cost of the purchase ensure you get
-              the balance from the customer
+            <div
+              className="mt-5 text-center mx-auto max-w-[600px]"
+              style={{ color: "var(--color-app-red)" }}
+            >
+              You will receive Kes {formatPrice(totalDeduction, "")} from the
+              subsidy program. If this does not cover the total cost of the
+              purchase ensure you get the balance from the customer
             </div>
           </div>
         </form>
@@ -278,27 +374,44 @@ export default function Home() {
 
   return (
     <BaseLayout>
-      <div>{view}</div>
+      <div>
+        <div className="mb-5">
+          <div className="font-bold">New purchase</div>
+          <div>
+            Inua Mkulima balance: {formatPrice(loggedUser?.balance || 0)}
+          </div>
+        </div>
+
+        {view}
+      </div>
 
       {!!newTransaction && (
-        <Dialog onOpenChange={() => setNewTransaction(null)} open>
-          <DialogContent>
+        <Dialog
+          onOpenChange={() => {
+            setNewTransaction(null);
+            router.push("/transactions");
+          }}
+          open
+          modal
+        >
+          <DialogContent className="text-center">
             <DialogHeader>
-              <DialogTitle>Payment successful</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-center">
+                Payment successful
+              </DialogTitle>
+              <DialogDescription className="text-center">
                 Ref number: {newTransaction.id}
+                <br />
                 Date:{" "}
                 {format(new Date(newTransaction.createdAt), "d MMMM yyyy")}
               </DialogDescription>
             </DialogHeader>
 
-            <DialogContent>
-              <div>{newTransaction.totalDeduction} Kes</div>
-            </DialogContent>
+            <div>{formatPrice(newTransaction.totalDeduction)}</div>
 
             <DialogFooter className="sm:justify-start">
               <DialogClose asChild>
-                <Button type="button" variant="secondary">
+                <Button type="button" variant="default" className="w-full">
                   Done
                 </Button>
               </DialogClose>

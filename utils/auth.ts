@@ -3,6 +3,7 @@ import { NextApiRequest } from "next";
 import { sessionCookieName } from "./cookies";
 import dbClient from "./db";
 import { throwApiError } from "./errors";
+import { isPast } from "date-fns";
 
 type SessionAndMerchant = Session & {
   merchant: Merchant;
@@ -18,6 +19,12 @@ export async function getApiSession(
     where: { token },
     include: { merchant: true },
   });
+
+  // honor session expiry on read
+  if (session && isPast(session?.expires)) {
+    return null;
+  }
+
   return session;
 }
 

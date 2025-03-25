@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import useSWR from "swr";
 
 export function useLoggedUser() {
-  const { isLoading, data, error } = useSWR<Merchant>("/api/auth/logged");
+  const { data, error } = useSWR<Merchant>("/api/auth/logged");
 
   const logOut = useCallback(() => {
     window.location.replace("/api/auth/logout");
@@ -12,7 +12,7 @@ export function useLoggedUser() {
 
   return {
     logged: data,
-    isLoading,
+    isLoading: !data && !error,
     logOut,
     error: !!error ? getApiErrorMessage(error) : null,
   };

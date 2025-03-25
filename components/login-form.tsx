@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { EyeClosedIcon, EyeIcon, Loader2Icon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
+import { mutate } from "swr";
 import { z } from "zod";
 
 const formSchema = z.object({
@@ -46,7 +47,7 @@ export function LoginForm() {
         throw body;
       }
 
-      window.location.reload();
+      await mutate("/api/auth/logged");
     } catch (error) {
       setSubmitErr(getApiErrorMessage(error));
     } finally {

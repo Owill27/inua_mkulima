@@ -1,6 +1,7 @@
 import BaseLayout from "@/components/BaseLayout";
 import { FC, ReactNode } from "react";
 import useSWR from "swr";
+import { TransactionsAPIReturn } from "../api/transactions";
 import { Loader2Icon, PlusIcon, RefreshCwIcon } from "lucide-react";
 import { getApiErrorMessage } from "@/utils/client-errors";
 import {
@@ -16,21 +17,20 @@ import { format } from "date-fns";
 import { formatPrice } from "@/utils/format-price";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/router";
-import { ProductsAPIReturn } from "./api/products";
 
-const HomePage: FC = () => {
+const TransactionsPage: FC = () => {
   const router = useRouter();
 
   const {
-    data: products,
+    data: transactions,
     isLoading,
     error,
     mutate,
-  } = useSWR<ProductsAPIReturn>("/api/products");
+  } = useSWR<TransactionsAPIReturn>("/api/transactions");
 
   let view: ReactNode = null;
 
-  if (isLoading && !products?.length) {
+  if (isLoading && !transactions?.length) {
     view = (
       <div className="flex w-full h-[100vh] items-center justify-center">
         <div>
@@ -38,17 +38,17 @@ const HomePage: FC = () => {
         </div>
       </div>
     );
-  } else if (error && !products?.length) {
+  } else if (error && !transactions?.length) {
     view = (
       <div className="text-center">
-        <div>Unable to load products</div>
+        <div>Unable to load transactions</div>
         {getApiErrorMessage(error)}
       </div>
     );
-  } else if (!products?.length) {
+  } else if (!transactions?.length) {
     view = (
       <div className="text-center">
-        <div>No products yet</div>
+        <div>No transactions yet</div>
       </div>
     );
   } else {
@@ -57,26 +57,26 @@ const HomePage: FC = () => {
         <TableHeader>
           <TableRow>
             <TableHead>ID</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead className="text-right">Price</TableHead>
-            <TableHead className="text-right">Subsidy</TableHead>
+            <TableHead>Farmer</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead className="text-right">Total amount</TableHead>
+            <TableHead className="text-right">Total deduction</TableHead>
           </TableRow>
         </TableHeader>
 
         <TableBody>
-          {products.map((prod) => (
-            <TableRow key={prod.id}>
-              <TableCell>{prod.id}</TableCell>
-              <TableCell>{prod.name}</TableCell>
+          {transactions.map((tr) => (
+            <TableRow key={tr.id}>
+              <TableCell>{tr.id}</TableCell>
+              <TableCell>{tr.farmer.name}</TableCell>
               <TableCell>
-                {format(new Date(prod.createdAt), "d MMM yyyy, h:mma")}
+                {format(new Date(tr.createdAt), "d MMM yyyy, h:mma")}
               </TableCell>
               <TableCell className="text-right">
-                {formatPrice(prod.price)}
+                {formatPrice(tr.totalAmount)}
               </TableCell>
               <TableCell className="text-right">
-                {prod.subsidyPercent}%
+                {formatPrice(tr.totalDeduction)}
               </TableCell>
             </TableRow>
           ))}
@@ -89,7 +89,7 @@ const HomePage: FC = () => {
     <BaseLayout>
       <Card>
         <CardHeader className="flex-col justify-between items-center">
-          All products
+          Transactions
         </CardHeader>
         <CardContent>
           <div className="flex gap-2 items-center mb-5">
@@ -98,12 +98,12 @@ const HomePage: FC = () => {
               onClick={() => router.push("/transactions/new")}
             >
               <PlusIcon />
-              Start a transaction
+              New transaction
             </Button>
 
             <Button variant="outline" onClick={() => mutate()}>
               <RefreshCwIcon />
-              Refresh products
+              Refresh
             </Button>
           </div>
 
@@ -114,4 +114,4 @@ const HomePage: FC = () => {
   );
 };
 
-export default HomePage;
+export default TransactionsPage;
