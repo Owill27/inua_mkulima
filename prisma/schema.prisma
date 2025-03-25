@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model FarmerWallet {
+  id      String   @id @default(cuid())
+  name    String
+  balance Int      @default(0)
+  farmers Farmer[] // wallet can have many farmers
+
+  @@map("farmer_wallets")
+}
+
+model Farmer {
+  id           String        @id @default(cuid())
+  name         String
+  phone        String
+  wallet       FarmerWallet  @relation(fields: [walletId], references: [id]) // farmer belongs to a signle wallet
+  walletId     String
+  transactions Transaction[] // farmer can have many transactions
+
+  @@map("farmers")
+}
+
+model Merchant {
+  id           String        @id @default(cuid())
+  name         String
+  phone        String
+  username     String        @unique // usernames must be unique
+  password     String
+  balance      Int
+  transactions Transaction[] // merchant can have many transactions
+  sessions     Session[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("merchants")
+}
+
+model Product {
+  id             String               @id @default(cuid())
+  name           String
+  price          Int
+  subsidyPercent Int
+  quantity       Int
+  transactions   TransactionProduct[] // product can be in many transactions
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@map("products")
+}
+
+model Transaction {
+  id             String               @id @default(cuid())
+  farmerId       String
+  farmer         Farmer               @relation(references: [id], fields: [farmerId])
+  merchantId     String
+  merchant       Merchant             @relation(references: [id], fields: [merchantId])
+  products       TransactionProduct[] // transaction can have many products
+  totalAmount    Int
+  totalDeduction Int
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@map("transactions")
+}
+
+model TransactionProduct {
+  id            String      @id @default(cuid())
+  productId     String
+  product       Product     @relation(references: [id], fields: [productId])
+  transactionId String
+  transaction   Transaction @relation(references: [id], fields: [transactionId])
+  quantity      Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("transaction_products")
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  token      String   @unique // auth tokens should be unique
+  merchantId String
+  merchant   Merchant @relation(references: [id], fields: [merchantId])
+  expires    DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
